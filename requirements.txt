@@ -1,3 +1,5 @@
 
 python-telegram-bot==20.6
 schedule
+
+pip install "python-telegram-bot[job-queue]"
