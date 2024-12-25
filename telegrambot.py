@@ -1,44 +1,44 @@
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
-import os
+from telegram import Update
+from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
-# Add your bot token here
-BOT_TOKEN = "7962771746:AAGmfNGa3iI46okfZ5kzyah8JL95baV8KT0"
-QUEUE = []  # Queue for storing posts
+# Queue for storing posts
+post_queue = []
 
-async def start(update, context):
-    await update.message.reply_text("Bot started! Send me posts to forward.")
+# Channel ID (replace with your channel's chat_id)
+CHANNEL_ID = "-1002265081796"
 
-async def add_post(update, context):
-    """Adds a post to the queue."""
-    QUEUE.append(update.message)
-    await update.message.reply_text(f"Post added. {len(QUEUE)} posts are in queue.")
+# Add posts to the queue
+async def add_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.photo:
+        post = {"photo": update.message.photo[-1].file_id, "caption": update.message.caption}
+        post_queue.append(post)
+        await update.message.reply_text(f"Post added. {len(post_queue)} posts are in the queue.")
+    else:
+        await update.message.reply_text("Please send a photo to add to the queue.")
 
-async def send_post(context):
-    """Sends posts from the queue to the specified channel."""
-    if QUEUE:
-        channel_id = "-1002265081796"  # Replace with your channel ID
-        message = QUEUE.pop(0)  # Get the first post in the queue
-        if message.photo:
-            await context.bot.send_photo(
-                chat_id=channel_id,
-                photo=message.photo[-1].file_id,
-                caption=message.caption,
-            )
-        elif message.text:
-            await context.bot.send_message(chat_id=channel_id, text=message.text)
+# Function to forward posts to the channel
+async def send_post(context: ContextTypes.DEFAULT_TYPE):
+    if post_queue:
+        post = post_queue.pop(0)  # Get the first post in the queue
+        await context.bot.send_photo(
+            chat_id=CHANNEL_ID,
+            photo=post["photo"],
+            caption=post["caption"]
+        )
 
+# Main function to start the bot
 def main():
-    application = Application.builder().token(BOT_TOKEN).build()
+    # Create application
+    application = Application.builder().token("YOUR_BOT_API_TOKEN").build()
 
-    # Create a job queue
+    # Add handlers
+    application.add_handler(MessageHandler(filters.PHOTO, add_post))
+
+    # Add JobQueue
     job_queue = application.job_queue
+    job_queue.run_repeating(send_post, interval=30 * 60, first=0)  # Run every 30 minutes
 
-    # Run the job queue for repeating tasks
-    job_queue.run_repeating(send_post, interval=30 * 60, first=0)  # Every 30 minutes
-
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.ALL, add_post))
-
+    # Run bot
     application.run_polling()
 
 if __name__ == "__main__":
